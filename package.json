@@ -1,0 +1,13 @@
+{
+  "name": "activity-detector",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "server": "bun run --watch server/index.ts",
+    "web": "bun --cwd web run dev",
+    "dev": "bun run web & bun run server",
+    "build": "bun --cwd web install && bun --cwd web run build",
+    "start": "bun run server/index.ts"
+  }
+}

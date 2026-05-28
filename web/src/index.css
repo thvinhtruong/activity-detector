@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Force light mode: `dark:` utilities only apply under a `.dark` ancestor,
+   which we never add — so they're effectively disabled. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
