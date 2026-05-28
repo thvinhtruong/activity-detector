@@ -1,6 +1,6 @@
 import { db } from "./db";
 
-const PORT = Number(process.env.PORT ?? 3001);
+const PORT = Number(process.env.PORT ?? 3000);
 const STATIC_ROOT = process.env.STATIC_ROOT ?? "web/dist";
 
 // SQLite-friendly UTC timestamp: "YYYY-MM-DD HH:MM:SS"
@@ -179,7 +179,8 @@ function handleApi(req: Request, url: URL): Response {
           `INSERT INTO time_entries (task_id, started_at) VALUES (?, ?)`,
         ).run(id, now);
         db.query(
-          `UPDATE tasks SET status = 'doing', updated_at = ? WHERE id = ?`,
+          `UPDATE tasks SET status = CASE WHEN status = 'recurring' THEN 'recurring' ELSE 'doing' END,
+                            updated_at = ? WHERE id = ?`,
         ).run(now, id);
       });
       tx();
