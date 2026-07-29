@@ -8,6 +8,7 @@ export interface Task {
   status: Status;
   recurrence: Recurrence;
   duration_minutes: number;
+  planned_for: string | null; // local day key "YYYY-MM-DD"; null = backlog
   archived: number;
   created_at: string;
   updated_at: string;
@@ -47,11 +48,19 @@ async function req<T>(url: string, opts?: RequestInit): Promise<T> {
 
 export const api = {
   tasks: () => req<{ tasks: Task[]; active: Active | null }>("/api/tasks"),
-  create: (title: string) =>
-    req<Task>("/api/tasks", { method: "POST", body: JSON.stringify({ title }) }),
+  create: (title: string, planned_for?: string) =>
+    req<Task>("/api/tasks", {
+      method: "POST",
+      body: JSON.stringify(planned_for ? { title, planned_for } : { title }),
+    }),
   update: (
     id: number,
-    patch: Partial<Pick<Task, "title" | "description" | "status" | "recurrence" | "duration_minutes">> & {
+    patch: Partial<
+      Pick<
+        Task,
+        "title" | "description" | "status" | "recurrence" | "duration_minutes" | "planned_for"
+      >
+    > & {
       archived?: boolean;
     },
   ) =>

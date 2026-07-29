@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "server": "bun run --watch server/index.ts",
-    "web": "bun --cwd web run dev",
+    "web": "bun run --cwd web dev",
     "dev": "bun run web & bun run server",
-    "build": "bun --cwd web install && bun --cwd web run build",
+    "build": "bun install --cwd web && bun run --cwd web build",
     "start": "bun run server/index.ts"
   }
 }

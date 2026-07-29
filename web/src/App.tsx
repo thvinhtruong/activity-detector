@@ -1,11 +1,12 @@
 import { useState } from "react";
 import TasksView from "./TasksView";
+import TodayView from "./TodayView";
 import ReportsView from "./ReportsView";
 
-type Tab = "tasks" | "reports";
+type Tab = "today" | "tasks" | "reports";
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("tasks");
+  const [tab, setTab] = useState<Tab>("today");
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -15,7 +16,7 @@ export default function App() {
             <span className="text-xl">⏱️</span> Activity Detector
           </h1>
           <nav className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-            {(["tasks", "reports"] as Tab[]).map((t) => (
+            {(["today", "tasks", "reports"] as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -33,7 +34,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-5xl px-5 py-6">
-        {tab === "tasks" ? <TasksView /> : <ReportsView />}
+        {tab === "today" ? <TodayView /> : tab === "tasks" ? <TasksView /> : <ReportsView />}
       </main>
     </div>
   );

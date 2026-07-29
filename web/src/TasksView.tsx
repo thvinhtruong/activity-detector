@@ -10,7 +10,13 @@ import {
   type Task,
   type TimeEntry,
 } from "./api";
-import { formatClock, formatDuration, formatMinutes, parseMinutes } from "./format";
+import {
+  formatClock,
+  formatDuration,
+  formatMinutes,
+  localDayKey,
+  parseMinutes,
+} from "./format";
 
 const STATUSES: Status[] = ["todo", "doing", "done", "recurring"];
 const RECURRENCES: Recurrence[] = ["daily", "weekly"];
@@ -186,6 +192,7 @@ export default function TasksView() {
             <tr>
               <th className="px-4 py-2.5 font-medium">Task</th>
               <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5 font-medium">Plan</th>
               <th className="px-4 py-2.5 text-right font-medium">Duration</th>
               <th className="px-4 py-2.5 text-right font-medium">Time</th>
               <th className="px-4 py-2.5 text-right font-medium">Track</th>
@@ -241,6 +248,9 @@ export default function TasksView() {
                       )}
                     </div>
                   </td>
+                  <td className="px-4 py-2.5">
+                    <PlanCell task={t} onChange={(day) => act(() => api.update(t.id, { planned_for: day }))()} />
+                  </td>
                   <td className="px-4 py-2.5 text-right">
                     <EditableDuration task={t} onSaved={refresh} onError={setError} />
                   </td>
@@ -288,7 +298,7 @@ export default function TasksView() {
                 </tr>
                 {expanded === t.id && (
                   <tr>
-                    <td colSpan={6} className="bg-slate-50/70 px-4 py-3 dark:bg-slate-800/30">
+                    <td colSpan={7} className="bg-slate-50/70 px-4 py-3 dark:bg-slate-800/30">
                       <EntriesEditor
                         taskId={t.id}
                         onChanged={refresh}
@@ -302,7 +312,7 @@ export default function TasksView() {
             })}
             {visibleTasks.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
                   {tasks.length === 0
                     ? "No tasks yet — add one above."
                     : "All tasks completed — use “Show completed” to see them."}
@@ -358,6 +368,54 @@ function EditableTitle({ task, onSaved }: { task: Task; onSaved: () => void }) {
     >
       {task.title}
     </button>
+  );
+}
+
+// Which day the task is planned for (see TodayView). Recurring tasks auto-appear
+// on every matching day, so they don't carry a planned_for date.
+function PlanCell({
+  task,
+  onChange,
+}: {
+  task: Task;
+  onChange: (day: string | null) => void;
+}) {
+  const today = localDayKey(new Date());
+
+  if (task.status === "recurring")
+    return <span className="text-xs text-slate-400">every {task.recurrence === "weekly" ? "week" : "day"}</span>;
+
+  if (!task.planned_for)
+    return (
+      <button
+        onClick={() => onChange(today)}
+        title="Plan for today"
+        className="rounded-md px-2 py-1 text-xs font-medium text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-900/30 dark:hover:text-indigo-300"
+      >
+        + Today
+      </button>
+    );
+
+  return (
+    <span className="flex items-center gap-1">
+      <input
+        type="date"
+        value={task.planned_for}
+        onChange={(e) => e.target.value && onChange(e.target.value)}
+        className={`cursor-pointer rounded-md border-0 px-1.5 py-1 text-xs font-medium ${
+          task.planned_for === today
+            ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+        }`}
+      />
+      <button
+        onClick={() => onChange(null)}
+        title="Unplan"
+        className="text-slate-300 hover:text-red-500"
+      >
+        ✕
+      </button>
+    </span>
   );
 }
 

@@ -17,6 +17,10 @@ const bad = (msg: string, status = 400) => json({ error: msg }, status);
 const STATUSES = ["todo", "doing", "done", "recurring"];
 const RECURRENCES = ["none", "daily", "weekly"];
 
+// A local calendar day key, "YYYY-MM-DD" (used by tasks.planned_for).
+const isDayKey = (v: unknown): v is string =>
+  typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
 // ---------- queries ----------
 const SECONDS = "(julianday(e.ended_at) - julianday(e.started_at)) * 86400";
 
@@ -83,13 +87,23 @@ function handleApi(req: Request, url: URL): Response {
       const duration = Number.isFinite(body?.duration_minutes)
         ? Math.max(0, Math.round(body.duration_minutes))
         : 90;
+      const planned_for = isDayKey(body?.planned_for) ? body.planned_for : null;
       const now = nowSQL();
       const row = db
         .query(
-          `INSERT INTO tasks (title, description, status, recurrence, duration_minutes, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+          `INSERT INTO tasks (title, description, status, recurrence, duration_minutes, planned_for, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
         )
-        .get(title, String(body?.description ?? ""), status, recurrence, duration, now, now);
+        .get(
+          title,
+          String(body?.description ?? ""),
+          status,
+          recurrence,
+          duration,
+          planned_for,
+          now,
+          now,
+        );
       return json(row, 201);
     }) as unknown as Response;
   }
@@ -127,6 +141,11 @@ function handleApi(req: Request, url: URL): Response {
         if (Number.isFinite(body.duration_minutes)) {
           fields.push("duration_minutes = ?");
           vals.push(Math.max(0, Math.round(body.duration_minutes)));
+        }
+        // planned_for: a day key plans the task for that day, null unplans it
+        if (body.planned_for === null || isDayKey(body.planned_for)) {
+          fields.push("planned_for = ?");
+          vals.push(body.planned_for);
         }
         if (typeof body.archived === "boolean") {
           fields.push("archived = ?");

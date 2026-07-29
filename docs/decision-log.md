@@ -10,6 +10,12 @@
 
 Skip entries for bug fixes, doc-only changes, style tweaks, and dependency bumps. (This LITE setup has no separate ADR files; if rationale grows long, link out from the bullet.)
 
+## 2026-07-30 — Task of the day (day planning)
+
+- **Decision** — Added `tasks.planned_for` (nullable **local** day key `"YYYY-MM-DD"`) plus a third `Today` tab (`web/src/TodayView.tsx`, now the default tab) that shows one day's plan with planned-vs-tracked totals and a backlog picker. Recurring tasks auto-appear (daily → every day, weekly → the weekday of `created_at`) and never store a `planned_for`.
+- **Why** — The flat task list couldn't answer "what should I do today?". A single date column on `tasks` (rather than a `day_plans` join table) keeps the single-user model and existing endpoints unchanged; derived recurring appearance avoids a scheduler that materializes rows per day.
+- **Implications** — `planned_for` is deliberately **not** in the UTC timestamp format — it's a local calendar date, so day boundaries follow the browser's timezone (consistent with existing client-side per-day bucketing). A task has at most one planned day; re-planning moves it. Recurring appearance can't be dismissed for a single day, and per-day tracked time is read from the existing `/api/report` range query rather than a new endpoint.
+
 ---
 
 ## 2026-05-27 — Task duration + recurring status

@@ -8,7 +8,8 @@ A local, self-hosted **time tracker + to-do list**. You create tasks, start a ti
 
 Core nouns:
 
-- **Task** — a to-do item with `status` ∈ `todo | doing | done | recurring` (CHECK-constrained in the schema), a `recurrence` ∈ `none | daily | weekly` (only meaningful when status = `recurring`), and a `duration_minutes` planned/estimate duration (default 90 = 1h30m, editable inline in the table; display-only, no timer interaction).
+- **Task** — a to-do item with `status` ∈ `todo | doing | done | recurring` (CHECK-constrained in the schema), a `recurrence` ∈ `none | daily | weekly` (only meaningful when status = `recurring`), a `duration_minutes` planned/estimate duration (default 90 = 1h30m, editable inline in the table; display-only, no timer interaction), and a nullable `planned_for` day (below).
+- **Day plan** ("task of the day") — the set of tasks to do on one calendar day. A task carries `planned_for`, a **local** day key `"YYYY-MM-DD"` (NULL = unplanned/backlog); a task has at most one planned day, so re-planning moves it. Recurring tasks are **derived** into a day's plan instead of being stored: `daily` appears on every day, `weekly` on the weekday of its `created_at` (local). They never get a `planned_for` value, and can't be dismissed from an individual day.
 - **TimeEntry** — a row in `time_entries` with `started_at` and a nullable `ended_at`. An entry with `ended_at IS NULL` is the **active timer**.
 - **Active timer** — there is at most **one** open `time_entry` across the whole DB at any moment.
 - **Duration** — never stored; computed in SQL as `julianday(ended_at) - julianday(started_at)` (×86400 for seconds).
@@ -49,14 +50,17 @@ web/src (React, :5173 dev)  --HTTP /api/*-->  server/index.ts (Bun.serve, :3001)
 
 ## Frontend — `web/src/`
 
-- `App.tsx` — two-tab shell: `TasksView` and `ReportsView`.
+- `App.tsx` — three-tab shell: `TodayView` (default), `TasksView`, `ReportsView`.
+- `TodayView.tsx` — the day planner: date stepper (◀ / ▶ / date input / "Jump to today"), planned-vs-tracked-vs-done header, one row per planned task (done checkbox, recurring badge, planned duration, tracked-today with a live clock for the running task, start/stop, ✕ to unplan), a title input that creates a task already planned for the shown day, and backlog chips that plan an existing task onto it. Per-day tracked time comes from `api.report(dayStart, dayNextStart)` summed per `task_id`; because the report counts a running entry up to fetch time, the active task's figure is topped up with `now - fetchedAt`.
+- `TasksView.tsx` — the full list; its **Plan** column shows `every day/week` for recurring tasks, a `+ Today` button when unplanned, or a date input + ✕ to move/clear `planned_for`.
 - `api.ts` — typed fetch wrapper **and** the source of shared types. Add new API calls + types here.
 - `format.ts` — time/date display helpers.
 - Tailwind v4 has **no config file**; use utility classes inline. Charts via Recharts.
 
 ## Data model
 
-- `tasks` — `id`, `status` (`todo|doing|done|recurring`), `recurrence` (`none|daily|weekly`), `duration_minutes` (INTEGER, default 90), plus title/timestamps. `status` and `recurrence` are CHECK-constrained.
+- `tasks` — `id`, `status` (`todo|doing|done|recurring`), `recurrence` (`none|daily|weekly`), `duration_minutes` (INTEGER, default 90), `planned_for` (TEXT, nullable, local day key `"YYYY-MM-DD"` — **not** a UTC timestamp), plus title/timestamps. `status` and `recurrence` are CHECK-constrained; `planned_for` is validated in `index.ts` (`isDayKey`) rather than by the schema.
+  - **Migration note:** `planned_for` is nullable with no CHECK, so `db.ts` adds it to old DBs with a plain `ALTER TABLE … ADD COLUMN` guarded by a `PRAGMA table_info(tasks)` check.
   - **Migration note:** because SQLite can't ALTER a CHECK constraint, `db.ts` detects a pre-`recurring` tasks table (by scanning its stored DDL) and rebuilds it (rename → recreate → copy → drop) under `legacy_alter_table=ON` + `foreign_keys=OFF` so `time_entries`' FK text keeps pointing at `tasks`. This runs once per old DB; fresh DBs skip it.
 - `time_entries` — `id`, `task_id` (FK), `started_at`, `ended_at` (nullable; NULL = active).
 - All timestamps are stored as **UTC text** (see below). `total_seconds` and report figures are computed, not columns.

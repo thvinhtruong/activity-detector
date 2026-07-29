@@ -12,6 +12,8 @@ db.exec("PRAGMA foreign_keys = ON;");
 // The tasks schema. `status` includes 'recurring' (a task done on a daily/weekly
 // cadence); `recurrence` is only meaningful when status = 'recurring'.
 // `duration_minutes` is a planned/estimate duration (default 1h30m).
+// `planned_for` is the LOCAL calendar day the task is planned for ("YYYY-MM-DD",
+// NULL = unplanned/backlog) — a date, not a UTC timestamp.
 const TASKS_SCHEMA = `
   CREATE TABLE IF NOT EXISTS tasks (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,6 +22,7 @@ const TASKS_SCHEMA = `
     status           TEXT    NOT NULL DEFAULT 'todo' CHECK (status IN ('todo','doing','done','recurring')),
     recurrence       TEXT    NOT NULL DEFAULT 'none' CHECK (recurrence IN ('none','daily','weekly')),
     duration_minutes INTEGER NOT NULL DEFAULT 90,
+    planned_for      TEXT,
     archived         INTEGER NOT NULL DEFAULT 0,
     created_at       TEXT    NOT NULL,
     updated_at       TEXT    NOT NULL
@@ -65,4 +68,13 @@ if (tasksDDL && !tasksDDL.includes("recurring")) {
   })();
   db.exec("PRAGMA legacy_alter_table = OFF;");
   db.exec("PRAGMA foreign_keys = ON;");
+}
+
+// `planned_for` is nullable with no CHECK, so a plain ADD COLUMN is enough.
+const taskCols = db
+  .query(`PRAGMA table_info(tasks)`)
+  .all() as { name: string }[];
+
+if (!taskCols.some((c) => c.name === "planned_for")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN planned_for TEXT;");
 }
