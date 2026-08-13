@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, parseUTC, type Active, type Task } from "./api";
 import { formatClock, formatDuration, formatMinutes, localDayKey } from "./format";
 import { useIdleAutoStop } from "./useIdleAutoStop";
+import { NotePanel, NotePreview, NoteToggle } from "./Notes";
 
 // A day plan is the set of tasks whose `planned_for` equals the day key, plus
 // recurring tasks that auto-appear (daily → every day, weekly → the weekday the
@@ -35,6 +36,7 @@ export default function TodayView() {
   const [now, setNow] = useState(Date.now());
   const [newTitle, setNewTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notesOpen, setNotesOpen] = useState<number | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   // 1s tick drives the live timer display
@@ -239,12 +241,13 @@ export default function TodayView() {
           return (
             <li
               key={t.id}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+              className={`rounded-xl border px-4 py-3 ${
                 running
                   ? "border-amber-300 bg-amber-50/70 dark:border-amber-700/60 dark:bg-amber-900/10"
                   : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
               }`}
             >
+              <div className="flex items-center gap-3">
               <input
                 type="checkbox"
                 checked={t.status === "done"}
@@ -274,6 +277,14 @@ export default function TodayView() {
                     </span>
                   )}
                   <span>plan {formatMinutes(t.duration_minutes)}</span>
+                  <NoteToggle
+                    task={t}
+                    open={notesOpen === t.id}
+                    onClick={() => setNotesOpen(notesOpen === t.id ? null : t.id)}
+                  />
+                  {notesOpen !== t.id && (
+                    <NotePreview task={t} className="min-w-0 text-slate-400" />
+                  )}
                 </div>
               </div>
 
@@ -317,6 +328,13 @@ export default function TodayView() {
               >
                 ✕
               </button>
+              </div>
+
+              {notesOpen === t.id && (
+                <div className="mt-2 border-t border-slate-200 pt-2 dark:border-slate-800">
+                  <NotePanel task={t} onSaved={refresh} onError={setError} />
+                </div>
+              )}
             </li>
           );
         })}

@@ -18,6 +18,9 @@ import {
   parseMinutes,
 } from "./format";
 import { useIdleAutoStop } from "./useIdleAutoStop";
+import { NotePanel, NotePreview, NoteToggle } from "./Notes";
+
+type Panel = "notes" | "entries";
 
 const STATUSES: Status[] = ["todo", "doing", "done", "recurring"];
 const RECURRENCES: Recurrence[] = ["daily", "weekly"];
@@ -35,7 +38,12 @@ export default function TasksView() {
   const [newTitle, setNewTitle] = useState("");
   const [now, setNow] = useState(Date.now());
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<number | null>(null);
+  // the one open detail row, and which panel it shows
+  const [expanded, setExpanded] = useState<{ id: number; panel: Panel } | null>(null);
+  const openPanel = (id: number, panel: Panel) =>
+    setExpanded((cur) =>
+      cur?.id === id && cur.panel === panel ? null : { id, panel },
+    );
   const [showDone, setShowDone] = useState(false);
 
   // 1s tick drives the live timer display
@@ -153,7 +161,20 @@ export default function TasksView() {
                   className={running ? "bg-amber-50/60 dark:bg-amber-900/10" : ""}
                 >
                   <td className="px-4 py-2.5">
-                    <EditableTitle task={t} onSaved={refresh} />
+                    <div className="flex items-center gap-1.5">
+                      <EditableTitle task={t} onSaved={refresh} />
+                      <NoteToggle
+                        task={t}
+                        open={expanded?.id === t.id && expanded.panel === "notes"}
+                        onClick={() => openPanel(t.id, "notes")}
+                      />
+                    </div>
+                    {expanded?.id !== t.id && (
+                      <NotePreview
+                        task={t}
+                        className="mt-0.5 block max-w-[22rem] text-xs text-slate-400"
+                      />
+                    )}
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5">
@@ -200,7 +221,7 @@ export default function TasksView() {
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                     <button
-                      onClick={() => setExpanded(expanded === t.id ? null : t.id)}
+                      onClick={() => openPanel(t.id, "entries")}
                       title="View / edit time entries"
                       className="rounded px-1 hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
@@ -240,14 +261,33 @@ export default function TasksView() {
                     </button>
                   </td>
                 </tr>
-                {expanded === t.id && (
+                {expanded?.id === t.id && (
                   <tr>
                     <td colSpan={7} className="bg-slate-50/70 px-4 py-3 dark:bg-slate-800/30">
-                      <EntriesEditor
-                        taskId={t.id}
-                        onChanged={refresh}
-                        onError={setError}
-                      />
+                      <div className="mb-2 flex gap-1">
+                        {(["notes", "entries"] as Panel[]).map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => setExpanded({ id: t.id, panel: p })}
+                            className={`rounded-md px-2 py-1 text-xs font-medium capitalize ${
+                              expanded.panel === p
+                                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                            }`}
+                          >
+                            {p === "notes" ? "Notes" : "Time entries"}
+                          </button>
+                        ))}
+                      </div>
+                      {expanded.panel === "notes" ? (
+                        <NotePanel task={t} onSaved={refresh} onError={setError} />
+                      ) : (
+                        <EntriesEditor
+                          taskId={t.id}
+                          onChanged={refresh}
+                          onError={setError}
+                        />
+                      )}
                     </td>
                   </tr>
                 )}
