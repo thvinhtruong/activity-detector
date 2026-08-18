@@ -7,3 +7,15 @@ services:
     volumes:
       - ./data:/data
     restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: activity-detector-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/vinhtruong.localhost.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/00-upgrade-map.conf:/etc/nginx/conf.d/00-upgrade-map.conf:ro
+    depends_on:
+      - activity-detector
+    restart: unless-stopped

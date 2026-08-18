@@ -23,7 +23,7 @@ Core nouns:
 | Backend | `Bun.serve`, hand-rolled path routing, `bun:sqlite` |
 | Frontend | React 18, Vite, Tailwind v4 (`@tailwindcss/vite`, no config file), Recharts |
 | Storage | Single SQLite file (`app.db`), WAL mode, foreign keys on |
-| Deploy | Docker (single container), DB persisted to a host volume |
+| Deploy | Docker compose: app container + `nginx:alpine` reverse proxy on :80, DB persisted to a host volume |
 
 No test framework, no linter, no migration tool, no CI.
 
@@ -50,12 +50,34 @@ web/src (React, :5173 dev)  --HTTP /api/*-->  server/index.ts (Bun.serve, :3001)
 
 ## Frontend — `web/src/`
 
-- `App.tsx` — three-tab shell: `TodayView` (default), `TasksView`, `ReportsView`.
+- `App.tsx` — three-tab shell: `TodayView` (default), `TasksView`, `ReportsView`, wrapped in `TrackingProvider` and carrying `TrackingStatus` in the header.
+- `tracking.tsx` — `TrackingProvider` / `useTracking`: the app-wide view of `{ tasks, active }` that the header pill needs on every tab. Views `publish()` what they just fetched (instant) and the provider also polls `/api/tasks` every 20s as a fallback for tabs that don't fetch (Reports). `version` is the reverse channel — `invalidate()` bumps it to ask every view to re-read, which is how an idle auto-stop triggered from the header reaches the views.
+- `TrackingStatus.tsx` — the header status pill (ambient tracking state: running task + live clock, or a red "Not tracking" once a reminder is due) plus the popover that hosts the two session flags as identical switch rows, along with stop / resume-last-task actions. This is the single home for both flags — they are deliberately not duplicated per view.
+- `useFocusMode.ts` / `useIdleAutoStop.ts` — the two session flags; see below.
 - `TodayView.tsx` — the day planner: date stepper (◀ / ▶ / date input / "Jump to today"), planned-vs-tracked-vs-done header, one row per planned task (done checkbox, recurring badge, planned duration, tracked-today with a live clock for the running task, start/stop, ✕ to unplan), a title input that creates a task already planned for the shown day, and backlog chips that plan an existing task onto it. Per-day tracked time comes from `api.report(dayStart, dayNextStart)` summed per `task_id`; because the report counts a running entry up to fetch time, the active task's figure is topped up with `now - fetchedAt`.
 - `TasksView.tsx` — the full list; its **Plan** column shows `every day/week` for recurring tasks, a `+ Today` button when unplanned, or a date input + ✕ to move/clear `planned_for`.
 - `api.ts` — typed fetch wrapper **and** the source of shared types. Add new API calls + types here.
 - `format.ts` — time/date display helpers.
 - Tailwind v4 has **no config file**; use utility classes inline. Charts via Recharts.
+
+### The two session flags (`useFocusMode.ts`, `useIdleAutoStop.ts`)
+
+Two opt-in, client-only flags (no server state, no schema) that both live in the `TrackingStatus` popover as a matched pair of switches:
+
+| Flag | localStorage | Behaviour |
+| --- | --- | --- |
+| **Focus mode** | `ad-focus` (`"1"`/`"0"`) | While on and **no** timer is running, remind every 5 min. Switching it **off** stops the running timer. |
+| **Auto-stop when idle** | `ad-autostop` (`"1"`/`"0"`) | Stops the timer after 15 min of system-wide idle / screen lock, backdating the stop to when inactivity began. |
+
+They are two halves of "keep my tracking honest" and are designed together: auto-stop closes a timer you forgot to stop, focus mode chases a timer you forgot to start.
+
+**Presence is declared, not detected.** Focus mode has no idle detection of its own — while it is on you are asserting that you intend to be tracking, so any untracked stretch earns a reminder. Finishing work means switching focus mode off, which also stops whatever is running, so "stop nagging me" and "I'm done for now" are deliberately the same action. (This replaced an earlier design that gated reminders on the Idle Detection API; the manual switch is simpler and doesn't depend on a Chrome-only permission.)
+
+- **Cadence** is fixed: reminders at 5, 10, 15… minutes untracked (`NUDGE_EVERY_MS`), counted from when the timer stopped or when focus mode was switched on.
+- **Channels**: an OS `Notification` (tagged `ad-focus`, so a new reminder replaces the previous one rather than stacking) and `document.title` — `● <task>` while tracking, `⏸ Not tracking` once the first reminder is due. The header pill also reflects state, but it's ambient status rather than a notification channel.
+- **Notification permission** is requested on the switch gesture, never on mount, and is deliberately **not awaited** — an ignored prompt would otherwise leave the switch looking dead. Everything except the OS notification works without it.
+- Elapsed time is always a `Date.now()` delta, never a count of `setInterval` ticks — a hidden tab throttles the 15s tick to roughly once a minute.
+- Only the OS notification depends on browser permission; the Idle Detection API (Chrome/Edge, separate permission) is needed **only** by auto-stop, which disables itself with an explanatory message where it isn't available.
 
 ## Data model
 
@@ -80,3 +102,24 @@ All timestamps are stored as **UTC** in the SQLite text format `"YYYY-MM-DD HH:M
 ## Deploy
 
 `docker compose up --build -d` builds the frontend and runs the single Bun process; the SQLite DB persists in `./data` on the host. `bun run start` is the non-Docker equivalent and requires a prior `bun run build` (else it serves a "frontend not built" message).
+
+### Local vanity domain (`http://vinhtruong.localhost`)
+
+A second compose service, `nginx` (`nginx:alpine`), listens on host port **80** and reverse-proxies to `activity-detector:3001` over the compose network — no host `nginx` install and no `sudo` needed, since Docker Desktop binds privileged ports itself. Config lives in `nginx/`, mounted read-only into `/etc/nginx/conf.d/`:
+
+| File | Purpose |
+| --- | --- |
+| `nginx/vinhtruong.localhost.conf` | Two blocks on :80 — a `default_server` catch-all (`server_name _`) that `return 444`s unrecognised Host headers, and the real proxy block for `vinhtruong.localhost localhost 127.0.0.1` with `X-Forwarded-*` headers, buffering off (SSE-safe), 3600s read timeout |
+| `nginx/00-upgrade-map.conf` | `map $http_upgrade $connection_upgrade` for WebSocket upgrades; `00-` prefix loads it before the server block |
+
+macOS and Chrome already resolve any `*.localhost` name to loopback (RFC 6761), so **no `/etc/hosts` entry is needed**. On a platform whose resolver doesn't, add one line (IP only — `/etc/hosts` does not accept ports):
+
+```
+127.0.0.1 vinhtruong.localhost
+```
+
+Port 3001 stays published, so `http://localhost:3001` keeps working alongside the vanity URL.
+
+The catch-all exists because a lone `server` block is implicitly the default and would answer to **any** Host header — including retired names. Reaching the app under a new hostname now requires adding it to `server_name`, so old names stop working the moment they leave that list.
+
+**The `.localhost` suffix is load-bearing, not cosmetic.** Idle auto-stop (`IdleDetector`) and focus-mode notifications (`Notification.requestPermission`) are gated on a *secure context*, which Chrome grants only to HTTPS origins plus `localhost`, `127.0.0.1`, and any `*.localhost` name. A plain-HTTP vanity host on a made-up TLD is an insecure origin, so `window.IdleDetector` is undefined there and auto-stop silently disables itself. Keeping the name under `.localhost` buys a secure context with no TLS certificate. Any future rename must stay under `.localhost` or move the proxy to HTTPS.

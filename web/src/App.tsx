@@ -2,6 +2,8 @@ import { useState } from "react";
 import TasksView from "./TasksView";
 import TodayView from "./TodayView";
 import ReportsView from "./ReportsView";
+import TrackingStatus from "./TrackingStatus";
+import { TrackingProvider } from "./tracking";
 
 type Tab = "today" | "tasks" | "reports";
 
@@ -9,33 +11,38 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("today");
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
-            <span className="text-xl">⏱️</span> Activity Detector
-          </h1>
-          <nav className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-            {(["today", "tasks", "reports"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition ${
-                  tab === t
-                    ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                    : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </header>
+    <TrackingProvider>
+      <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-5 py-3">
+            <h1 className="flex items-center gap-2 text-lg font-semibold">
+              <span className="text-xl">⏱️</span> Activity Detector
+            </h1>
+            <div className="ml-auto flex items-center gap-3">
+              <TrackingStatus />
+              <nav className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+                {(["today", "tasks", "reports"] as Tab[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTab(t)}
+                    className={`cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
+                      tab === t
+                        ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                        : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+        </header>
 
-      <main className="mx-auto max-w-5xl px-5 py-6">
-        {tab === "today" ? <TodayView /> : tab === "tasks" ? <TasksView /> : <ReportsView />}
-      </main>
-    </div>
+        <main className="mx-auto max-w-5xl px-5 py-6">
+          {tab === "today" ? <TodayView /> : tab === "tasks" ? <TasksView /> : <ReportsView />}
+        </main>
+      </div>
+    </TrackingProvider>
   );
 }

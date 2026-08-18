@@ -17,7 +17,7 @@ import {
   localDayKey,
   parseMinutes,
 } from "./format";
-import { useIdleAutoStop } from "./useIdleAutoStop";
+import { useTracking } from "./tracking";
 import { NotePanel, NotePreview, NoteToggle } from "./Notes";
 
 type Panel = "notes" | "entries";
@@ -45,6 +45,8 @@ export default function TasksView() {
       cur?.id === id && cur.panel === panel ? null : { id, panel },
     );
   const [showDone, setShowDone] = useState(false);
+  // see TodayView: `publish` feeds the header pill, `version` asks us to re-read
+  const { publish, version } = useTracking();
 
   // 1s tick drives the live timer display
   useEffect(() => {
@@ -57,19 +59,14 @@ export default function TasksView() {
       const { tasks, active } = await api.tasks();
       setTasks(tasks);
       setActive(active);
+      publish(tasks, active);
     } catch (e: any) {
       setError(e.message);
     }
   }
   useEffect(() => {
     refresh();
-  }, []);
-
-  const { autoStop, toggleAutoStop, idleMsg } = useIdleAutoStop({
-    active,
-    onStopped: refresh,
-    onError: setError,
-  });
+  }, [version]);
 
   const liveSeconds = (taskId: number, base: number) => {
     if (active?.task_id !== taskId) return base;
@@ -112,16 +109,6 @@ export default function TasksView() {
       </form>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <label className="flex cursor-pointer items-center gap-2 text-slate-600 dark:text-slate-300">
-          <input
-            type="checkbox"
-            checked={autoStop}
-            onChange={(e) => toggleAutoStop(e.target.checked)}
-            className="h-4 w-4 accent-indigo-600"
-          />
-          Auto-stop timer after 15 min idle
-        </label>
-        {idleMsg && <span className="text-xs text-amber-600 dark:text-amber-400">{idleMsg}</span>}
         {doneCount > 0 && (
           <button
             onClick={() => setShowDone((v) => !v)}

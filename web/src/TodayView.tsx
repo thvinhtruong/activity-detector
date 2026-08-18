@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, parseUTC, type Active, type Task } from "./api";
 import { formatClock, formatDuration, formatMinutes, localDayKey } from "./format";
-import { useIdleAutoStop } from "./useIdleAutoStop";
+import { useTracking } from "./tracking";
 import { NotePanel, NotePreview, NoteToggle } from "./Notes";
 
 // A day plan is the set of tasks whose `planned_for` equals the day key, plus
@@ -38,6 +38,9 @@ export default function TodayView() {
   const [error, setError] = useState<string | null>(null);
   const [notesOpen, setNotesOpen] = useState<number | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  // the header pill mirrors this view's data; `version` bumps when the header
+  // changes something (e.g. idle auto-stop) and this view must re-read
+  const { publish, version } = useTracking();
 
   // 1s tick drives the live timer display
   useEffect(() => {
@@ -61,6 +64,7 @@ export default function TodayView() {
       }
       setTasks(tasks);
       setActive(active);
+      publish(tasks, active);
       setTracked(sums);
       setFetchedAt(Date.now());
     } catch (e: any) {
@@ -69,13 +73,7 @@ export default function TodayView() {
   }
   useEffect(() => {
     refresh();
-  }, [day]);
-
-  const { autoStop, toggleAutoStop, idleMsg } = useIdleAutoStop({
-    active,
-    onStopped: refresh,
-    onError: setError,
-  });
+  }, [day, version]);
 
   const act = (fn: () => Promise<unknown>) => async () => {
     try {
@@ -197,19 +195,6 @@ export default function TodayView() {
             </span>
           </span>
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <label className="flex cursor-pointer items-center gap-2 text-slate-600 dark:text-slate-300">
-          <input
-            type="checkbox"
-            checked={autoStop}
-            onChange={(e) => toggleAutoStop(e.target.checked)}
-            className="h-4 w-4 accent-indigo-600"
-          />
-          Auto-stop timer after 15 min idle
-        </label>
-        {idleMsg && <span className="text-xs text-amber-600 dark:text-amber-400">{idleMsg}</span>}
       </div>
 
       {error && (
