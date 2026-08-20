@@ -1,5 +1,5 @@
 {
-  "name": "activity-detector-web",
+  "name": "zeitgeber-web",
   "private": true,
   "type": "module",
   "scripts": {

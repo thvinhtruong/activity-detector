@@ -33,6 +33,7 @@ export interface ReportEntry {
   task_id: number;
   title: string;
   status: Status;
+  recurrence: Recurrence;
   started_at: string; // "YYYY-MM-DD HH:MM:SS" (UTC)
   ended_at: string;
 }

@@ -16,9 +16,9 @@ export default function App() {
         <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-5 py-3">
             <h1 className="flex items-center gap-2 text-lg font-semibold">
-              <span className="text-xl">⏱️</span> Activity Detector
+              <span className="text-xl">🌅</span> Zeitgeber
             </h1>
-            <div className="ml-auto flex items-center gap-3">
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
               <TrackingStatus />
               <nav className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
                 {(["today", "tasks", "reports"] as Tab[]).map((t) => (

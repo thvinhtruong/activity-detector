@@ -2,6 +2,13 @@
 
 > Read this for **every** task — it's the always-on backbone. Jump to the section your task type points at (see `CLAUDE.md` `<context-routing>`).
 
+> **Name.** The app is **Zeitgeber** (German "time giver" — the external cue that entrains a
+> circadian rhythm; focus mode is that cue). The repo folder, the compose service, the
+> `container_name`, and the nginx upstream are all still `activity-detector` — deliberately, so
+> the running deployment and the git remote kept working. Don't "fix" that inconsistency in
+> passing; renaming the compose service needs `--remove-orphans` or the old container keeps
+> port 3001.
+
 ## Product & domain
 
 A local, self-hosted **time tracker + to-do list**. You create tasks, start a timer on one, and later view reports of where time went. Single-user, no auth.
@@ -46,15 +53,19 @@ web/src (React, :5173 dev)  --HTTP /api/*-->  server/index.ts (Bun.serve, :3001)
 
 - `POST /api/tasks/:id/start` runs in a transaction: `stopRunning` (close any open entry) → insert new `time_entry` → set task `status = 'doing'`.
 - Marking a task `done` (PATCH) stops the running timer.
-- Reports clip entries to the requested range; in-progress entries count up to "now".
+- Reports clip entries to the requested range; in-progress entries count up to "now". Each row carries the task's `title`, `status` **and `recurrence`** so the client can split recurring from one-off work.
 
 ## Frontend — `web/src/`
 
 - `App.tsx` — three-tab shell: `TodayView` (default), `TasksView`, `ReportsView`, wrapped in `TrackingProvider` and carrying `TrackingStatus` in the header.
 - `tracking.tsx` — `TrackingProvider` / `useTracking`: the app-wide view of `{ tasks, active }` that the header pill needs on every tab. Views `publish()` what they just fetched (instant) and the provider also polls `/api/tasks` every 20s as a fallback for tabs that don't fetch (Reports). `version` is the reverse channel — `invalidate()` bumps it to ask every view to re-read, which is how an idle auto-stop triggered from the header reaches the views.
-- `TrackingStatus.tsx` — the header status pill (ambient tracking state: running task + live clock, or a red "Not tracking" once a reminder is due) plus the popover that hosts the two session flags as identical switch rows, along with stop / resume-last-task actions. This is the single home for both flags — they are deliberately not duplicated per view.
+- `TrackingStatus.tsx` — the two session flags as identical always-visible switch chips (`FlagChip`) in the header, and **nothing else**: there is no status badge/popover, because the running task's title, live clock and stop button already live on its row in `TodayView` and a header copy only competed with them. The component still mounts both hooks on every tab — that's its other job, since the reminder clock, `document.title` and the idle watcher must run regardless of which view is open. A flag's `notice` (permission denied, auto-stopped, or a failed stop) rides its chip as an amber ring + `title` tooltip; a `sr-only` live region announces an overdue reminder.
 - `useFocusMode.ts` / `useIdleAutoStop.ts` — the two session flags; see below.
 - `TodayView.tsx` — the day planner: date stepper (◀ / ▶ / date input / "Jump to today"), planned-vs-tracked-vs-done header, one row per planned task (done checkbox, recurring badge, planned duration, tracked-today with a live clock for the running task, start/stop, ✕ to unplan), a title input that creates a task already planned for the shown day, and backlog chips that plan an existing task onto it. Per-day tracked time comes from `api.report(dayStart, dayNextStart)` summed per `task_id`; because the report counts a running entry up to fetch time, the active task's figure is topped up with `now - fetchedAt`.
+- `ReportsView.tsx` — two halves fed by **one** `/api/report` call (every range ends today, so the Today half just clips the same entries to local midnight). Only the first half is on screen by default; `rangeKey === null` is the default state and means "today only" — it fetches today's window alone, and picking a range reveals the second half (`✕ Hide` returns to today-only):
+  - **Today** — hero total for the current local day, the recurring / one-off split as a 100%-stacked meter, and per-task rows.
+  - **Range** (`Week | Month | 3 months | 6 months | Year`, on demand) — a stacked bar chart bucketed automatically from the range (day → week → month; every bucket in the range gets a column, empty ones included, so a week off doesn't stretch the time axis), plus per-task totals as **horizontal rows** (bar under the title) split into `One-off tasks` / `Recurring tasks` groups, capped at `TOP_N` with a "show more" expander. Row bars share one scale (the largest task in the report) so lengths stay comparable across the two groups.
+  - Recurring vs one-off comes from the entry's **`recurrence`**, not its `status` — a recurring task ticked off for the day has `status = 'done'`. Its two colours are categorical slots 1 (blue `#2a78d6`) and 2 (orange `#eb6834`); they follow the kind of task, never its rank.
 - `TasksView.tsx` — the full list; its **Plan** column shows `every day/week` for recurring tasks, a `+ Today` button when unplanned, or a date input + ✕ to move/clear `planned_for`.
 - `api.ts` — typed fetch wrapper **and** the source of shared types. Add new API calls + types here.
 - `format.ts` — time/date display helpers.
@@ -62,7 +73,7 @@ web/src (React, :5173 dev)  --HTTP /api/*-->  server/index.ts (Bun.serve, :3001)
 
 ### The two session flags (`useFocusMode.ts`, `useIdleAutoStop.ts`)
 
-Two opt-in, client-only flags (no server state, no schema) that both live in the `TrackingStatus` popover as a matched pair of switches:
+Two opt-in, client-only flags (no server state, no schema) that both live in the header as a matched pair of always-visible switch chips:
 
 | Flag | localStorage | Behaviour |
 | --- | --- | --- |

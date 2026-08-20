@@ -13,7 +13,7 @@ import type { Active } from "./api";
 // so the "stop nagging me" action and the "I'm done" action are the same one.
 
 const KEY = "ad-focus";
-const BASE_TITLE = "Activity Detector";
+const BASE_TITLE = "Zeitgeber";
 const NUDGE_EVERY_MS = 5 * 60_000;
 const TICK_MS = 15_000;
 

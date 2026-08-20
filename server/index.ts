@@ -285,7 +285,7 @@ function handleApi(req: Request, url: URL): Response {
     // include running entries by treating ended_at as now; clip to [from,to]
     const rows = db
       .query(
-        `SELECT e.id, e.task_id, t.title, t.status,
+        `SELECT e.id, e.task_id, t.title, t.status, t.recurrence,
                 MAX(e.started_at, ?)              AS started_at,
                 MIN(COALESCE(e.ended_at, ?), ?)   AS ended_at
          FROM time_entries e JOIN tasks t ON t.id = e.task_id
@@ -325,4 +325,4 @@ Bun.serve({
   },
 });
 
-console.log(`activity-detector listening on http://localhost:${PORT}`);
+console.log(`zeitgeber listening on http://localhost:${PORT}`);

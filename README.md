@@ -1,9 +1,16 @@
-# Activity Detector
+# Zeitgeber
 <img width="1022" height="472" alt="Screenshot 2026-05-28 at 13 00 34" src="https://github.com/user-attachments/assets/519d56a5-2ae1-44da-89b0-1022cfd53dc2" />
 
 A local, self-hosted time tracker & to-do list. Track time per task with a
 live start/stop timer, switch task status (todo → doing → done) from a table,
 and see how much time you spend over a range of days or weeks.
+
+Named after the [zeitgeber](https://en.wikipedia.org/wiki/Zeitgeber) — German for
+"time giver", the external cue that entrains a circadian rhythm. Focus mode is
+the cue: while it's on and no timer is running, it reminds you every 5 minutes.
+
+> The Docker service, container and nginx upstream are still named
+> `activity-detector` — only the app's own name changed.
 
 - **Runtime:** [Bun](https://bun.sh) — one process serves the REST API *and* the built frontend
 - **Frontend:** React + Vite + Tailwind v4 + Recharts
